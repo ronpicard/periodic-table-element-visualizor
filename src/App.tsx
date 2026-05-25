@@ -38,7 +38,7 @@ export default function App() {
         />
         <Suspense
           fallback={
-            <section className="atom-viewer atom-viewer--loading">
+            <section className="panel atom-viewer atom-viewer--loading" aria-label="Loading viewer">
               <p>Loading 3D viewer…</p>
             </section>
           }

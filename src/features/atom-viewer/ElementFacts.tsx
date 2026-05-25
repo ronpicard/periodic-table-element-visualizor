@@ -8,6 +8,7 @@ interface ElementFactsProps {
 export function ElementFacts({ info }: ElementFactsProps) {
   return (
     <section className="element-facts" aria-label="Element facts">
+      <h3 className="element-facts__title">About this element</h3>
       <dl className="element-facts__list">
         <div>
           <dt>Discovery</dt>
