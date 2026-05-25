@@ -230,7 +230,7 @@ function getNucleusParticleScale(total: number): number {
     return 0.05;
   }
 
-  return Math.min(0.09, Math.max(0.022, 0.5 / Math.cbrt(total)));
+  return Math.min(0.12, Math.max(0.035, 0.58 / Math.cbrt(total)));
 }
 
 /** Radius that fits `total` same-size spheres in close-packed arrangement. */

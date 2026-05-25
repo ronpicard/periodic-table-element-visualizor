@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `README.md`, `CHANGELOG.md`, and `REQUIREMENTS.md` per project documentation rules.
 
+### Fixed
+
+- Nucleus protons and neutrons visible again (restored per-color instanced rendering; instance-color path failed under React Three Fiber).
+
 ## [1.0.0] - 2026-05-25
 
 ### Added
