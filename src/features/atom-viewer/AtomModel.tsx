@@ -1,7 +1,8 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group, InstancedMesh } from 'three';
-import { Object3D } from 'three';
+import { Color, Object3D } from 'three';
+import type { NucleonSpherePosition } from '@/shared/lib/atom-structure';
 import {
   getAtomViewRadius,
   getNucleusLayout,
@@ -18,45 +19,54 @@ const NEUTRON_COLOR = '#868e96';
 const ELECTRON_COLOR = '#ff4757';
 const SHELL_COLORS = ['#ffd43b', '#69db7c', '#748ffc', '#da77f2', '#ff922b', '#38d9a9', '#e599f7'];
 
-function InstancedParticles({
-  positions,
-  color,
+const NUCLEON_COLORS: Record<NucleonSpherePosition['kind'], string> = {
+  proton: PROTON_COLOR,
+  neutron: NEUTRON_COLOR,
+};
+
+function InstancedNucleons({
+  nucleons,
   scale,
 }: {
-  positions: Array<[number, number, number]>;
-  color: string;
+  nucleons: NucleonSpherePosition[];
   scale: number;
 }) {
   const meshRef = useRef<InstancedMesh>(null);
 
   useLayoutEffect(() => {
     const mesh = meshRef.current;
-    if (!mesh || positions.length === 0) {
+    if (!mesh || nucleons.length === 0) {
       return;
     }
 
     const dummy = new Object3D();
+    const color = new Color();
 
-    positions.forEach((position, index) => {
-      dummy.position.set(...position);
+    nucleons.forEach((nucleon, index) => {
+      dummy.position.set(...nucleon.position);
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
+      color.set(NUCLEON_COLORS[nucleon.kind]);
+      mesh.setColorAt(index, color);
     });
 
     mesh.instanceMatrix.needsUpdate = true;
-  }, [positions, scale]);
+    if (mesh.instanceColor) {
+      mesh.instanceColor.needsUpdate = true;
+    }
+  }, [nucleons, scale]);
 
-  if (positions.length === 0) {
+  if (nucleons.length === 0) {
     return null;
   }
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, positions.length]}>
-      <sphereGeometry args={[1, 12, 12]} />
+    <instancedMesh ref={meshRef} args={[undefined, undefined, nucleons.length]}>
+      <sphereGeometry args={[1, 14, 14]} />
       <meshStandardMaterial
-        color={color}
-        emissive={color}
+        color="#ffffff"
+        emissive="#ffffff"
         emissiveIntensity={0.45}
         roughness={0.35}
         metalness={0.1}
@@ -66,17 +76,12 @@ function InstancedParticles({
 }
 
 function Nucleus({ element }: { element: ElementDetails }) {
-  const { protons, neutrons, particleScale } = useMemo(
+  const { nucleons, particleScale } = useMemo(
     () => getNucleusLayout(element.atomicNumber, element.neutrons),
     [element.atomicNumber, element.neutrons],
   );
 
-  return (
-    <group>
-      <InstancedParticles positions={protons} color={PROTON_COLOR} scale={particleScale} />
-      <InstancedParticles positions={neutrons} color={NEUTRON_COLOR} scale={particleScale} />
-    </group>
-  );
+  return <InstancedNucleons nucleons={nucleons} scale={particleScale} />;
 }
 
 function ElectronShell({
