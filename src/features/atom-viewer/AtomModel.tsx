@@ -1,12 +1,12 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type { Group, InstancedMesh } from 'three';
-import { Color, Object3D } from 'three';
-import type { NucleonSpherePosition } from '@/shared/lib/atom-structure';
+import type { InstancedMesh, Mesh } from 'three';
+import { Color, Object3D, Quaternion, Vector3 } from 'three';
+import type { ElectronOrbitLayout, NucleonSpherePosition } from '@/shared/lib/atom-structure';
 import {
   getAtomViewRadius,
+  getElectronOrbitalLayout,
   getNucleusLayout,
-  getShellRadius,
 } from '@/shared/lib/atom-structure';
 import type { ElementDetails } from '@/shared/types/element';
 
@@ -84,54 +84,105 @@ function Nucleus({ element }: { element: ElementDetails }) {
   return <InstancedNucleons nucleons={nucleons} scale={particleScale} />;
 }
 
+const ORBIT_AXIS = new Vector3(0, 0, 1);
+
+function getOrbitBasis(normal: [number, number, number]) {
+  const normalVector = new Vector3(...normal);
+  const reference = Math.abs(normalVector.z) < 0.9 ? new Vector3(0, 0, 1) : new Vector3(1, 0, 0);
+  const tangentU = new Vector3().crossVectors(normalVector, reference).normalize();
+  const tangentV = new Vector3().crossVectors(normalVector, tangentU).normalize();
+
+  return {
+    tangentU: tangentU.toArray() as [number, number, number],
+    tangentV: tangentV.toArray() as [number, number, number],
+  };
+}
+
+function OrbitalRing({ orbit, color }: { orbit: ElectronOrbitLayout; color: string }) {
+  const alignment = useMemo(() => {
+    const quaternion = new Quaternion();
+    quaternion.setFromUnitVectors(ORBIT_AXIS, new Vector3(...orbit.normal));
+    return quaternion;
+  }, [orbit.normal]);
+
+  return (
+    <group quaternion={alignment}>
+      <mesh>
+        <torusGeometry args={[orbit.radius, 0.014, 8, 96]} />
+        <meshBasicMaterial color={color} transparent opacity={0.42} />
+      </mesh>
+    </group>
+  );
+}
+
+function OrbitingElectron({
+  orbit,
+  phase,
+}: {
+  orbit: ElectronOrbitLayout;
+  phase: number;
+}) {
+  const meshRef = useRef<Mesh>(null);
+  const basis = useMemo(() => getOrbitBasis(orbit.normal), [orbit.normal]);
+
+  useFrame(({ clock }) => {
+    const mesh = meshRef.current;
+    if (!mesh) {
+      return;
+    }
+
+    const angle = phase + clock.getElapsedTime() * orbit.angularSpeed;
+    const [ux, uy, uz] = basis.tangentU;
+    const [vx, vy, vz] = basis.tangentV;
+    const radius = orbit.radius;
+
+    mesh.position.set(
+      radius * (Math.cos(angle) * ux + Math.sin(angle) * vx),
+      radius * (Math.cos(angle) * uy + Math.sin(angle) * vy),
+      radius * (Math.cos(angle) * uz + Math.sin(angle) * vz),
+    );
+  });
+
+  return (
+    <mesh ref={meshRef}>
+      <sphereGeometry args={[0.065, 12, 12]} />
+      <meshStandardMaterial
+        color={ELECTRON_COLOR}
+        emissive={ELECTRON_COLOR}
+        emissiveIntensity={0.9}
+        roughness={0.2}
+      />
+    </mesh>
+  );
+}
+
 function ElectronShell({
   shellIndex,
   electronCount,
-  spinOffset,
   shellColor,
 }: {
   shellIndex: number;
   electronCount: number;
-  spinOffset: number;
   shellColor: string;
 }) {
-  const groupRef = useRef<Group>(null);
-  const radius = getShellRadius(shellIndex);
-
-  useFrame(({ clock }) => {
-    if (!groupRef.current) return;
-    groupRef.current.rotation.y = clock.getElapsedTime() * (0.35 + shellIndex * 0.08) + spinOffset;
-    groupRef.current.rotation.x = shellIndex * 0.55;
-    groupRef.current.rotation.z = shellIndex * 0.25;
-  });
-
-  const electrons = useMemo(() => {
-    return Array.from({ length: electronCount }, (_, index) => {
-      const angle = (index / electronCount) * Math.PI * 2;
-      return {
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
-        z: 0,
-      };
-    });
-  }, [electronCount, radius]);
+  const orbits = useMemo(
+    () => getElectronOrbitalLayout(shellIndex, electronCount),
+    [shellIndex, electronCount],
+  );
 
   return (
-    <group ref={groupRef}>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[radius, 0.014, 8, 96]} />
-        <meshBasicMaterial color={shellColor} transparent opacity={0.42} />
-      </mesh>
-      {electrons.map((position, index) => (
-        <mesh key={index} position={[position.x, position.y, position.z]}>
-          <sphereGeometry args={[0.065, 12, 12]} />
-          <meshStandardMaterial
-            color={ELECTRON_COLOR}
-            emissive={ELECTRON_COLOR}
-            emissiveIntensity={0.9}
-            roughness={0.2}
-          />
-        </mesh>
+    <group>
+      {orbits.map((orbit, orbitIndex) => (
+        <group key={`${shellIndex}-${orbitIndex}-${orbit.normal.join(',')}`}>
+          <OrbitalRing orbit={orbit} color={shellColor} />
+          {orbit.phases.map((phase, electronIndex) => (
+            <OrbitingElectron
+              key={`${orbitIndex}-${electronIndex}`}
+              orbit={orbit}
+              phase={phase}
+            />
+          ))}
+        </group>
       ))}
     </group>
   );
@@ -146,7 +197,6 @@ export function AtomModel({ element }: AtomModelProps) {
           key={shellIndex}
           shellIndex={shellIndex}
           electronCount={count}
-          spinOffset={shellIndex * 1.2}
           shellColor={SHELL_COLORS[shellIndex % SHELL_COLORS.length]}
         />
       ))}
