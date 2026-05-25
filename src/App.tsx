@@ -9,7 +9,7 @@ const AtomViewer = lazy(() =>
 );
 
 export default function App() {
-  const [selectedAtomicNumber, setSelectedAtomicNumber] = useState(6);
+  const [selectedAtomicNumber, setSelectedAtomicNumber] = useState(118);
 
   const selectedElement = useMemo(() => {
     const element = getElementByNumber(selectedAtomicNumber) ?? getElementByNumber(1)!;

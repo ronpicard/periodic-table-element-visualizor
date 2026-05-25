@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nucleus protons and neutrons visible again (restored per-color instanced rendering; instance-color path failed under React Three Fiber).
 
+### Changed
+
+- Default selected element on load is Oganesson (Og, 118).
+
 ## [1.0.0] - 2026-05-25
 
 ### Added
